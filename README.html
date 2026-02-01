@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Student Location Publish System</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<style>
+:root{
+  --bg:#f2f2f2;
+  --card:#ffffff;
+  --text:#000;
+  --primary:#00b3b3;
+}
+.dark{
+  --bg:#0f172a;
+  --card:#020617;
+  --text:#e5e7eb;
+  --primary:#22d3ee;
+}
+
+*{box-sizing:border-box}
+body{
+  margin:0;
+  font-family:Arial,Helvetica,sans-serif;
+  background:var(--bg);
+  color:var(--text);
+  transition:0.4s;
+}
+
+header{
+  background:linear-gradient(90deg,var(--primary),#2563eb);
+  color:#fff;
+  padding:16px;
+  text-align:center;
+  font-size:22px;
+}
+
+nav{
+  display:flex;
+  gap:10px;
+  padding:10px;
+  background:#111;
+  flex-wrap:wrap;
+}
+nav button{
+  background:var(--primary);
+  border:none;
+  color:#000;
+  padding:8px 14px;
+  border-radius:6px;
+  cursor:pointer;
+  transition:0.3s;
+}
+nav button:hover{transform:scale(1.05)}
+
+.container{padding:15px}
+.hidden{display:none}
+
+.box{
+  background:var(--card);
+  padding:15px;
+  margin:15px 0;
+  border-radius:10px;
+  box-shadow:0 10px 30px rgba(0,0,0,.3);
+  animation:fade 0.5s ease;
+}
+
+@keyframes fade{
+  from{opacity:0;transform:translateY(10px)}
+  to{opacity:1;transform:translateY(0)}
+}
+
+input,select{
+  width:100%;
+  padding:8px;
+  margin:5px 0;
+  border-radius:6px;
+  border:1px solid #888;
+}
+
+table{
+  width:100%;
+  border-collapse:collapse;
+}
+th,td{
+  border:1px solid #555;
+  padding:8px;
+  text-align:center;
+}
+th{background:#334155;color:#fff}
+
+.admin-btn{
+  background:#ef4444;
+  color:#fff;
+  border:none;
+  padding:5px 10px;
+  border-radius:5px;
+  cursor:pointer;
+}
+.edit-btn{
+  background:#22c55e;
+  color:#000;
+  border:none;
+  padding:5px 10px;
+  border-radius:5px;
+  cursor:pointer;
+}
+
+.toggle{
+  margin-left:auto;
+  background:#fff;
+  color:#000;
+}
+</style>
+</head>
+
+<body>
+
+<header>Student Location Publish System</header>
+
+<nav>
+  <button onclick="showHome()">Publish</button>
+  <button onclick="showStudent()">Student View</button>
+  <button onclick="showLogin()">Admin</button>
+  <button class="toggle" onclick="toggleMode()">🌙 / ☀️</button>
+</nav>
+
+<div class="container">
+
+<!-- PUBLISH PAGE -->
+<div id="home">
+  <h2>Published Data</h2>
+  <div id="homeView"></div>
+</div>
+
+<!-- STUDENT VIEW -->
+<div id="studentPage" class="hidden">
+  <h2>Student Details</h2>
+  <select id="studentFilter" onchange="loadStudentData()"></select>
+  <div id="studentData"></div>
+</div>
+
+<!-- LOGIN -->
+<div id="loginPage" class="hidden box">
+  <h3>Admin Login</h3>
+  <input id="user" placeholder="Username">
+  <input id="pass" type="password" placeholder="Password">
+  <button onclick="login()">Login</button>
+</div>
+
+<!-- ADMIN PANEL -->
+<div id="adminPage" class="hidden">
+  <h2>Admin Panel</h2>
+
+  <label>Date</label>
+  <input type="date" id="date">
+
+  <h4>Add Student</h4>
+  <input id="studentInput">
+  <button onclick="addStudent()">Add</button>
+
+  <h4>Add Location</h4>
+  <input id="locationInput">
+  <button onclick="addLocation()">Add</button>
+
+  <h4>Allocate</h4>
+  <select id="studentSelect"></select>
+  <select id="locationSelect"></select>
+  <button onclick="publish()">Publish</button>
+
+  <h4>Manage Published Data</h4>
+  <div id="adminView"></div>
+</div>
+
+</div>
+
+<script>
+const ADMIN_USER="student";
+const ADMIN_PASS="1234";
+
+let students=JSON.parse(localStorage.getItem("students"))||[];
+let locations=JSON.parse(localStorage.getItem("locations"))||[];
+let published=JSON.parse(localStorage.getItem("published"))||[];
+let isAdmin=false;
+
+/* AUTO DELETE PAST DATES */
+const today=new Date().toISOString().split("T")[0];
+published=published.filter(p=>p.date>=today);
+save();
+
+/* NAV */
+function hideAll(){
+  home.classList.add("hidden");
+  studentPage.classList.add("hidden");
+  loginPage.classList.add("hidden");
+  adminPage.classList.add("hidden");
+}
+function showHome(){hideAll();home.classList.remove("hidden");loadHome();}
+function showStudent(){hideAll();studentPage.classList.remove("hidden");loadStudentFilter();}
+function showLogin(){hideAll();loginPage.classList.remove("hidden");}
+
+/* LOGIN */
+function login(){
+  if(user.value===ADMIN_USER && pass.value===ADMIN_PASS){
+    isAdmin=true;
+    hideAll();
+    adminPage.classList.remove("hidden");
+    loadAdmin();
+  }else alert("Invalid login");
+}
+
+/* ADMIN */
+function addStudent(){
+  if(studentInput.value){
+    students.push(studentInput.value);
+    studentInput.value="";
+    save();loadAdmin();
+  }
+}
+function addLocation(){
+  if(locationInput.value){
+    locations.push(locationInput.value);
+    locationInput.value="";
+    save();loadAdmin();
+  }
+}
+function publish(){
+  if(!date.value)return alert("Select date");
+  published.push({
+    date:date.value,
+    student:studentSelect.value,
+    location:locationSelect.value
+  });
+  published.sort((a,b)=>new Date(a.date)-new Date(b.date));
+  save();loadAdmin();loadHome();
+}
+
+/* HOME VIEW */
+function loadHome(){
+  homeView.innerHTML="";
+  let grp={};
+  published.forEach(p=>{
+    if(!grp[p.date])grp[p.date]=[];
+    grp[p.date].push(p);
+  });
+  Object.keys(grp).sort().forEach(d=>{
+    let h=`<div class="box"><h3>${d}</h3>
+    <table><tr><th>Student</th><th>Location</th></tr>`;
+    grp[d].forEach(r=>{
+      h+=`<tr><td>${r.student}</td><td>${r.location}</td></tr>`;
+    });
+    h+=`</table></div>`;
+    homeView.innerHTML+=h;
+  });
+}
+
+/* STUDENT VIEW */
+function loadStudentFilter(){
+  studentFilter.innerHTML="<option>Select Student</option>";
+  students.forEach(s=>studentFilter.innerHTML+=`<option>${s}</option>`);
+}
+function loadStudentData(){
+  studentData.innerHTML="";
+  published.filter(p=>p.student===studentFilter.value)
+  .forEach(p=>{
+    studentData.innerHTML+=`
+    <div class="box">${p.date}<br>Location: ${p.location}</div>`;
+  });
+}
+
+/* ADMIN VIEW */
+function loadAdmin(){
+  studentSelect.innerHTML=students.map(s=>`<option>${s}</option>`).join("");
+  locationSelect.innerHTML=locations.map(l=>`<option>${l}</option>`).join("");
+  adminView.innerHTML="";
+  published.forEach((p,i)=>{
+    adminView.innerHTML+=`
+    <div class="box">
+      ${p.date} - ${p.student} (${p.location})
+      <br><br>
+      <button class="edit-btn" onclick="edit(${i})">Edit</button>
+      <button class="admin-btn" onclick="del(${i})">Delete</button>
+    </div>`;
+  });
+}
+
+function edit(i){
+  date.value=published[i].date;
+  studentSelect.value=published[i].student;
+  locationSelect.value=published[i].location;
+  published.splice(i,1);
+  save();loadAdmin();
+}
+
+function del(i){
+  if(!isAdmin)return;
+  published.splice(i,1);
+  save();loadAdmin();loadHome();
+}
+
+/* MODE */
+function toggleMode(){
+  document.body.classList.toggle("dark");
+}
+
+/* SAVE */
+function save(){
+  localStorage.setItem("students",JSON.stringify(students));
+  localStorage.setItem("locations",JSON.stringify(locations));
+  localStorage.setItem("published",JSON.stringify(published));
+}
+
+showHome();
+</script>
+
+</body>
+</html>
